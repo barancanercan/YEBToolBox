@@ -4,6 +4,7 @@ import pandas as pd
 from urllib.parse import urlparse
 from scraper import NewsSiteConfig, UniversalNewsScraper
 import io
+from streamlit_trend_app import run_trends_app # run_trends_app fonksiyonunu import ettim
 
 
 def get_site_config(url: str) -> NewsSiteConfig:
@@ -71,122 +72,139 @@ def get_site_config(url: str) -> NewsSiteConfig:
             turkish_date_parsing_enabled=False # Varsayılan olarak Türkçe olmayan siteler için False
         )
 
-st.set_page_config(
-    page_title="YEB Haber Scraper",
-    page_icon="📰",
-    layout="centered",
-    initial_sidebar_state="expanded"
-)
+# Ana uygulama mantığı
+def main():
+    st.set_page_config(
+        page_title="YEB Uygulama Portalı", # Ana sayfanın başlığı
+        page_icon="⭐",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
 
-st.title("📰 YEB Haber Scraper")
-st.markdown("Haber sitelerinden belirli tarih aralıklarındaki makaleleri çekin ve indirin.")
+    st.sidebar.title("Uygulama Seçimi")
+    app_mode = st.sidebar.radio(
+        "Lütfen bir uygulama seçin:",
+        ("Haber Scraper", "Google Trends Analizi")
+    )
 
-# Session state'i başlat
-if 'news_df' not in st.session_state:
-    st.session_state['news_df'] = pd.DataFrame()
-if 'button_clicked' not in st.session_state:
-    st.session_state['button_clicked'] = False
+    if app_mode == "Haber Scraper":
+        run_news_scraper_app()
+    elif app_mode == "Google Trends Analizi":
+        run_trends_app()
 
-# --- Kullanıcı Girişleri ---
+def run_news_scraper_app():
+    st.title("📰 YEB Haber Scraper")
+    st.markdown("Haber sitelerinden belirli tarih aralıklarındaki makaleleri çekin ve indirin.")
 
-st.header("1. Haber Sitesi Linki")
-news_site_url = st.text_input(
-    "Lütfen haber sitesinin URL'sini girin (örneğin: https://www.hurriyet.com.tr)",
-    "https://www.hurriyet.com.tr"
-)
+    # Session state'i başlat
+    if 'news_df' not in st.session_state:
+        st.session_state['news_df'] = pd.DataFrame()
+    if 'button_clicked' not in st.session_state:
+        st.session_state['button_clicked'] = False
 
-st.header("2. Tarih ve Saat Aralığı")
+    # --- Kullanıcı Girişleri ---
 
-col1, col2 = st.columns(2)
+    st.header("1. Haber Sitesi Linki")
+    news_site_url = st.text_input(
+        "Lütfen haber sitesinin URL'sini girin (örneğin: https://www.hurriyet.com.tr)",
+        "https://www.hurriyet.com.tr"
+    )
 
-with col1:
-    start_date = st.date_input("Başlangıç Tarihi", datetime.now() - timedelta(days=1))
-    start_time_input = st.time_input("Başlangıç Saati", time(0, 0))
+    st.header("2. Tarih ve Saat Aralığı")
 
-with col2:
-    end_date = st.date_input("Bitiş Tarihi", datetime.now())
-    end_time_input = st.time_input("Bitiş Saati", time(23, 59))
+    col1, col2 = st.columns(2)
 
-start_datetime = datetime.combine(start_date, start_time_input)
-end_datetime = datetime.combine(end_date, end_time_input)
+    with col1:
+        start_date = st.date_input("Başlangıç Tarihi", datetime.now() - timedelta(days=1))
+        start_time_input = st.time_input("Başlangıç Saati", time(0, 0))
 
-# Hata ve durum mesajları için yer tutucular
-error_placeholder = st.empty()
-status_placeholder = st.empty()
+    with col2:
+        end_date = st.date_input("Bitiş Tarihi", datetime.now())
+        end_time_input = st.time_input("Bitiş Saati", time(23, 59))
 
-if start_datetime >= end_datetime:
-    error_placeholder.error("Başlangıç tarihi ve saati, bitiş tarihinden ve saatinden önce olmalıdır.")
+    start_datetime = datetime.combine(start_date, start_time_input)
+    end_datetime = datetime.combine(end_date, end_time_input)
 
-# --- Haber Çekme Butonu ---
-st.markdown("---")
+    # Hata ve durum mesajları için yer tutucular
+    error_placeholder = st.empty()
+    status_placeholder = st.empty()
 
-if not st.session_state['button_clicked']:
-    if st.button("Haberleri Çek", type="primary", key='fetch_news_button'):
-        if start_datetime < end_datetime:
-            error_placeholder.empty() # Önceki hatayı temizle
-            status_placeholder.info("Haberler çekiliyor, lütfen bekleyin...")
-            st.session_state['button_clicked'] = True # Butona tıklandığını işaretle
-            
-            config = get_site_config(news_site_url)
-            scraper = UniversalNewsScraper(config)
-            
-            # İlerleme raporlama fonksiyonu
-            def update_status(message):
-                status_placeholder.info(message)
+    if start_datetime >= end_datetime:
+        error_placeholder.error("Başlangıç tarihi ve saati, bitiş tarihinden ve saatinden önce olmalıdır.")
 
-            with st.spinner('Haberler çekiliyor...'):
-                news_data = scraper.scrape_news_by_time_range(start_datetime, end_datetime, max_listing_pages=2, status_callback=update_status)
-            
-            if news_data:
-                st.success(f"✓ {len(news_data)} haber bulundu!")
-                df = pd.DataFrame(news_data)
-                st.session_state['news_df'] = df
-                st.rerun() # DataFrame güncellendiğinde uygulamayı yeniden çalıştır
-            else:
-                st.warning("Belirtilen kriterlere uygun haber bulunamadı.")
-                st.session_state['button_clicked'] = False # Haber bulunamazsa butonu tekrar göster
-        else:
-            error_placeholder.error("Lütfen geçerli bir tarih aralığı seçin.")
-            st.session_state['button_clicked'] = False # Hata olursa butonu tekrar göster
-
-# Eğer haberler çekildiyse, sonuçları ve indirme butonlarını göster
-if not st.session_state['news_df'].empty:
-    st.header("3. Çekilen Haberler")
-    st.dataframe(st.session_state['news_df'])
-
-    st.subheader("4. Sonuçları İndir")
-    df_to_download = st.session_state['news_df']
-
-    col_csv, col_excel = st.columns(2)
-
-    with col_csv:
-        csv_buffer = io.StringIO()
-        df_to_download.to_csv(csv_buffer, index=False, encoding='utf-8-sig')
-        st.download_button(
-            label="CSV Olarak İndir",
-            data=csv_buffer.getvalue(),
-            file_name=f"yeb_haberler_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv",
-            key='download_csv'
-        )
-
-    with col_excel:
-        excel_buffer = io.BytesIO()
-        with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
-            df_to_download.to_excel(writer, index=False, sheet_name='Haberler')
-        excel_buffer.seek(0)
-        st.download_button(
-            label="Excel Olarak İndir",
-            data=excel_buffer.getvalue(),
-            file_name=f"yeb_haberler_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key='download_excel'
-        )
-
-# Eğer yeniden çekmek isterse butonu tekrar göster
-if st.session_state['button_clicked'] and not st.session_state['news_df'].empty:
+    # --- Haber Çekme Butonu ---
     st.markdown("---")
-    if st.button("Yeni Arama Yap", key='new_search_button'):
-        st.session_state['news_df'] = pd.DataFrame() # Mevcut veriyi temizle
-        st.session_state['button_clicked'] = False # Butonu tekrar göster
-        st.rerun() 
+
+    if not st.session_state['button_clicked']:
+        if st.button("Haberleri Çek", type="primary", key='fetch_news_button'):
+            if start_datetime < end_datetime:
+                error_placeholder.empty() # Önceki hatayı temizle
+                status_placeholder.info("Haberler çekiliyor, lütfen bekleyin...")
+                st.session_state['button_clicked'] = True # Butona tıklandığını işaretle
+                
+                config = get_site_config(news_site_url)
+                scraper = UniversalNewsScraper(config)
+                
+                # İlerleme raporlama fonksiyonu
+                def update_status(message):
+                    status_placeholder.info(message)
+
+                with st.spinner('Haberler çekiliyor...'):
+                    news_data = scraper.scrape_news_by_time_range(start_datetime, end_datetime, max_listing_pages=2, status_callback=update_status)
+                
+                if news_data:
+                    st.success(f"✓ {len(news_data)} haber bulundu!")
+                    df = pd.DataFrame(news_data)
+                    st.session_state['news_df'] = df
+                    st.rerun() # DataFrame güncellendiğinde uygulamayı yeniden çalıştır
+                else:
+                    st.warning("Belirtilen kriterlere uygun haber bulunamadı.")
+                    st.session_state['button_clicked'] = False # Haber bulunamazsa butonu tekrar göster
+            else:
+                error_placeholder.error("Lütfen geçerli bir tarih aralığı seçin.")
+                st.session_state['button_clicked'] = False # Hata olursa butonu tekrar göster
+
+    # Eğer haberler çekildiyse, sonuçları ve indirme butonlarını göster
+    if not st.session_state['news_df'].empty:
+        st.header("3. Çekilen Haberler")
+        st.dataframe(st.session_state['news_df'])
+
+        st.subheader("4. Sonuçları İndir")
+        df_to_download = st.session_state['news_df']
+
+        col_csv, col_excel = st.columns(2)
+
+        with col_csv:
+            csv_buffer = io.StringIO()
+            df_to_download.to_csv(csv_buffer, index=False, encoding='utf-8-sig')
+            st.download_button(
+                label="CSV Olarak İndir",
+                data=csv_buffer.getvalue(),
+                file_name=f"yeb_haberler_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                key='download_csv'
+            )
+
+        with col_excel:
+            excel_buffer = io.BytesIO()
+            with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
+                df_to_download.to_excel(writer, index=False, sheet_name='Haberler')
+            excel_buffer.seek(0)
+            st.download_button(
+                label="Excel Olarak İndir",
+                data=excel_buffer.getvalue(),
+                file_name=f"yeb_haberler_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key='download_excel'
+            )
+
+    # Eğer yeniden çekmek isterse butonu tekrar göster
+    if st.session_state['button_clicked'] and not st.session_state['news_df'].empty:
+        st.markdown("---")
+        if st.button("Yeni Arama Yap", key='new_search_button'):
+            st.session_state['news_df'] = pd.DataFrame() # Mevcut veriyi temizle
+            st.session_state['button_clicked'] = False # Butonu tekrar göster
+            st.rerun()
+
+if __name__ == "__main__":
+    main() 
