@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from trend_analyzer import TrendAnalyzer
+from .trend_analyzer import TrendAnalyzer
 import io
 import plotly.express as px
 
