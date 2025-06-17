@@ -3,13 +3,22 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.Python
-env/
-venv/
-.venv/
 
-# Editor
+# Virtual environment
+.venv/
+venv/
+env/
+
+# IDE/editor
 .idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+
+# Dev containers
+.devcontainer/
 
 # Streamlit
 .streamlit/

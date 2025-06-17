@@ -2,9 +2,9 @@ import streamlit as st
 from datetime import datetime, time, timedelta, date
 import pandas as pd
 from urllib.parse import urlparse
-from scraper import NewsSiteConfig, UniversalNewsScraper
+from app.scraper import NewsSiteConfig, UniversalNewsScraper
 import io
-from streamlit_trend_app import run_trends_app # run_trends_app fonksiyonunu import ettim
+from app.streamlit_trend_app import run_trends_app
 
 
 def get_site_config(url: str) -> NewsSiteConfig:
